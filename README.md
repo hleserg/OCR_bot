@@ -1,3 +1,328 @@
+def extract_text(self, image_bytes, language='auto'):
+    try:
+        # Предварительная обработка изображения
+        processed_image = self.preprocess_image(image_bytes)
+        
+        # Получаем конфигурацию Tesseract
+        config = self.tesseract_config.get(language, self.tesseract_config['auto'])
+        
+        # Извлекаем текст
+        text = pytesseract.image_to_string(processed_image, config=config)
+        
+        # Очищаем текст от лишних символов
+        text = text.strip()
+        
+        # Удаляем пустые строки
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        cleaned_text = '\n'.join(lines)
+        
+        self.logger.info(f"Текст успешно извлечен, длина: {len(cleaned_text)} символов")
+        return cleaned_text
+        
+    except Exception as e:
+        self.logger.error(f"Ошибка при извлечении текста: {e}")
+        raise
+def extract_text(self, image_bytes, language='auto', psm=None):
+    try:
+        # Предварительная обработка изображения
+        processed_image = self.preprocess_image(image_bytes)
+        
+        # Получаем конфигурацию Tesseract
+        base_config = self.tesseract_config.get(language, self.tesseract_config['auto'])
+        
+        # Добавляем PSM параметр если он указан
+        if psm is not None:
+            base_config += f' --psm {psm}'
+            
+        # Извлекаем текст
+        text = pytesseract.image_to_string(processed_image, config=base_config)
+        
+        # Очищаем текст от лишних символов
+        cleaned_text = self._clean_text(text)
+        
+        self.logger.info(f"Текст успешно извлечен, длина: {len(cleaned_text)} символов")
+        return cleaned_text
+        
+    except Exception as e:
+        self.logger.error(f"Ошибка при извлечении текста: {e}")
+        raise
+
+def _clean_text(self, text):
+    """Очистка текста от лишних символов"""
+    text = text.strip()
+    
+    # Удаляем пустые строки
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    
+    # Опционально: применяем кастомные правила очистки
+    cleaned_lines = []
+    for line in lines:
+        if self.config.get('remove_special_chars', False):
+            line = ''.join(c for c in line if c.isalnum() or c.isspace())
+        cleaned_lines.append(line)
+    
+    return '\n'.join(cleaned_lines)
+def detect_language(self, text):
+    try:
+        # Простая эвристика для определения языка
+        russian_chars = len([c for c in text if 'а' <= c.lower() <= 'я' or c.lower() in 'ёъь'])
+        english_chars = len([c for c in text if 'a' <= c.lower() <= 'z'])
+        
+        total_chars = russian_chars + english_chars
+        
+        if total_chars == 0:
+            return 'unknown'
+        
+        russian_ratio = russian_chars / total_chars
+        english_ratio = english_chars / total_chars
+        
+        if russian_ratio > 0.7:
+            return 'russian'
+        elif english_ratio > 0.7:
+            return 'english'
+        else:
+            return 'mixed'
+            
+    except Exception as e:
+        self.logger.error(f"Ошибка при определении языка: {e}")
+        return 'unknown'
+def detect_language(self, text):
+    try:
+        # Простая эвристика для определения языка
+        russian_chars = len([c for c in text if 'а' <= c.lower() <= 'я' or c.lower() in 'ёъь'])
+        english_chars = len([c for c in text if 'a' <= c.lower() <= 'z'])
+        
+        total_chars = russian_chars + english_chars
+        
+        if total_chars == 0:
+            return 'unknown'
+        
+        russian_ratio = russian_chars / total_chars
+        english_ratio = english_chars / total_chars
+        
+        if russian_ratio > 0.7:
+            return 'russian'
+        elif english_ratio > 0.7:
+            return 'english'
+        else:
+            return 'mixed'
+            
+    except Exception as e:
+        self.logger.error(f"Ошибка при определении языка: {e}")
+        return 'unknown'
+async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    ...
+    photo_file = await update.message.photo[-1].get_file()
+    ...
+    photo_bytes = await photo_file.download_as_bytearray()
+    ...
+    extracted_text = self.ocr_processor.extract_text(photo_bytes)
+    ...
+async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    ...
+    # Получаем файл фотографии (берем самый большой размер)
+    photo_file = await update.message.photo[-1].get_file()
+    
+    # Проверяем размер изображения
+    if photo_file.file_size > MAX_IMAGE_SIZE_FOR_PROCESSING:
+        # Если изображение слишком большое, получаем меньший размер
+        if len(update.message.photo) > 1:
+            photo_file = await update.message.photo[-2].get_file()
+        else:
+            await processing_msg.edit_text(
+                "🖼️ Изображение слишком большое для обработки. "
+                "Попробуйте отправить изображение меньшего размера.",
+                parse_mode='HTML'
+            )
+            return
+    
+    ...
+    # Скачиваем файл в память
+    photo_bytes = await photo_file.download_as_bytearray()
+    
+    # Преобразуем в numpy массив для OpenCV
+    np_array = np.frombuffer(photo_bytes, dtype=np.uint8)
+    img = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+    
+    # Изменяем размер если нужно
+    if max(img.shape[0], img.shape[1]) > MAX_IMAGE_DIMENSION:
+        scale = MAX_IMAGE_DIMENSION / max(img.shape[0], img.shape[1])
+        img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    
+    # Преобразуем обратно в bytes
+    _, buffer = cv2.imencode('.jpg', img)
+    resized_bytes = buffer.tobytes()
+    
+    ...
+    extracted_text = self.ocr_processor.extract_text(resized_bytes)
+    ...
+async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    ...
+    # Получаем файл фотографии (берем самый большой размер)
+    photo_file = await update.message.photo[-1].get_file()
+    
+    # Проверяем размер изображения
+    if photo_file.file_size > MAX_IMAGE_SIZE_FOR_PROCESSING:
+        # Если изображение слишком большое, получаем меньший размер
+        if len(update.message.photo) > 1:
+            photo_file = await update.message.photo[-2].get_file()
+        else:
+            await processing_msg.edit_text(
+                "🖼️ Изображение слишком большое для обработки. "
+                "Попробуйте отправить изображение меньшего размера.",
+                parse_mode='HTML'
+            )
+            return
+    
+    ...
+    # Скачиваем файл в память
+    photo_bytes = await photo_file.download_as_bytearray()
+    
+    # Преобразуем в numpy массив для OpenCV
+    np_array = np.frombuffer(photo_bytes, dtype=np.uint8)
+    img = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+    
+    # Изменяем размер если нужно
+    if max(img.shape[0], img.shape[1]) > MAX_IMAGE_DIMENSION:
+        scale = MAX_IMAGE_DIMENSION / max(img.shape[0], img.shape[1])
+        img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    
+    # Преобразуем обратно в bytes
+    _, buffer = cv2.imencode('.jpg', img)
+    resized_bytes = buffer.tobytes()
+    
+    ...
+    extracted_text = self.ocr_processor.extract_text(resized_bytes)
+    ...
+def format_result(self, display_text, text_info, is_truncated, max_length):
+    template = """
+📄 <b>Результат извлечения текста:</b>
+
+📝 <b>Извлеченный текст:</b>
+<pre>{text}</pre>
+
+📊 <b>Статистика:</b>
+• Язык: {lang_emoji} {language}
+• Символов: <b>{chars}</b>
+• Слов: <b>{words}</b>
+• Строк: <b>{lines}</b>
+• Содержит цифры: {digits}
+• Спецсимволы: {special_chars}
+{truncated_note}
+📷 <i>Отправьте новое изображение для анализа!</i>
+"""
+    
+    language = text_info.get('language', 'unknown')
+    lang_emoji = {
+        'russian': '🇷🇺',
+        'english': '🇺🇸',
+        'mixed': '🌐',
+        'unknown': '❓'
+    }.get(language, '❓')
+    
+    truncated_note = ""
+    if is_truncated:
+        truncated_note = f"\n⚠️ <i>Текст обрезан (показаны первые {max_length} символов)</i>"
+    
+    return template.format(
+        text=display_text,
+        lang_emoji=lang_emoji,
+        language=language.title(),
+        chars=text_info.get('length', 0),
+        words=text_info.get('words', 0),
+        lines=text_info.get('lines', 0),
+        digits='✅' if text_info.get('has_numbers', False) else '❌',
+        special_chars='✅' if text_info.get('has_special_chars', False) else '❌',
+        truncated_note=truncated_note
+    )
+def format_result(self, display_text, text_info, is_truncated, max_length):
+    template = """
+📄 <b>Результат извлечения текста:</b>
+
+📝 <b>Извлеченный текст:</b>
+<pre>{text}</pre>
+
+📊 <b>Статистика:</b>
+• Язык: {lang_emoji} {language}
+• Символов: <b>{chars}</b>
+• Слов: <b>{words}</b>
+• Строк: <b>{lines}</b>
+• Содержит цифры: {digits}
+• Спецсимволы: {special_chars}
+{truncated_note}
+📷 <i>Отправьте новое изображение для анализа!</i>
+"""
+    
+    language = text_info.get('language', 'unknown')
+    lang_emoji = {
+        'russian': '🇷🇺',
+        'english': '🇺🇸',
+        'mixed': '🌐',
+        'unknown': '❓'
+    }.get(language, '❓')
+    
+    truncated_note = ""
+    if is_truncated:
+        truncated_note = f"\n⚠️ <i>Текст обрезан (показаны первые {max_length} символов)</i>"
+    
+    return template.format(
+        text=display_text,
+        lang_emoji=lang_emoji,
+        language=language.title(),
+        chars=text_info.get('length', 0),
+        words=text_info.get('words', 0),
+        lines=text_info.get('lines', 0),
+        digits='✅' if text_info.get('has_numbers', False) else '❌',
+        special_chars='✅' if text_info.get('has_special_chars', False) else '❌',
+        truncated_note=truncated_note
+    )
+   --oem 1 --psm 3  # Быстрый режим
+   # Stage 1: Build
+FROM python:3.11-slim as builder
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-rus \
+    libglib2.0-0 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Stage 2: Final
+FROM python:3.11-slim
+
+# Установка Tesseract
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-rus \
+    libglib2.0-0 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /app /logs
+
+# Копирование зависимостей из stage 1
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/root/.local/lib/python3.11/site-packages
+COPY --from=builder /root/.local /root/.local
+
+WORKDIR /app
+
+# Копирование кода приложения
+COPY . .
+
+# Создание пользователя для безопасности
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app /logs
+USER app
+
+# Команда запуска
+CMD ["python", "ocr_telegram_bot.py"]
 # OCR Telegram Bot 🤖📄
 
 Телеграм бот для извлечения текста из изображений документов с помощью OpenCV и Tesseract OCR.

@@ -150,7 +150,7 @@ class OCRTelegramBot:
             )
             
             # Извлекаем текст
-            extracted_text = self.ocr_processor.extract_text(photo_bytes)
+            extracted_text = await self.ocr_processor.extract_text(photo_bytes)
             
             # Проверяем, что текст извлечен
             if not extracted_text or len(extracted_text.strip()) == 0:
@@ -279,7 +279,7 @@ class OCRTelegramBot:
             )
             
             # Извлекаем текст
-            extracted_text = self.ocr_processor.extract_text(doc_bytes)
+            extracted_text = await self.ocr_processor.extract_text(doc_bytes)
             
             # Проверяем, что текст извлечен
             if not extracted_text or len(extracted_text.strip()) == 0:
