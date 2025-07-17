@@ -1,0 +1,10 @@
+# Telegram Bot
+python-telegram-bot>=20.0
+
+# OCR and Image Processing
+opencv-python-headless>=4.8.0
+pytesseract>=0.3.10
+Pillow>=10.0.0
+
+# Utilities
+python-dotenv>=1.0.0
